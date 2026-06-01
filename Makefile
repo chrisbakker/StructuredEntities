@@ -1,4 +1,4 @@
-PLUGIN_ID  := entities
+PLUGIN_ID  := structured-entities
 DIST_DIR   := dist
 ZIP_NAME   := $(PLUGIN_ID).zip
 
@@ -28,22 +28,20 @@ build-views:
 ## Package build artifacts into a zip ready for manual Obsidian deployment
 ##
 ## Zip layout (matches Obsidian plugin structure):
-##   entities/
+##   structured-entities/
 ##     main.js
 ##     styles.css
 ##     manifest.json
 ##     views/
 ##       person/index.js
 ##       org/index.js
+##       meeting/index.js
 package:
-	@if [ -z "$(VAULT_DIR)" ]; then \
-		echo "Error: could not read VAULT_PLUGIN_DIR from vault.config.mjs"; exit 1; \
-	fi
 	rm -rf $(DIST_DIR)/$(PLUGIN_ID)
 	mkdir -p $(DIST_DIR)/$(PLUGIN_ID)/views/person
 	mkdir -p $(DIST_DIR)/$(PLUGIN_ID)/views/org
 	mkdir -p $(DIST_DIR)/$(PLUGIN_ID)/views/meeting
-	cp $(VAULT_DIR)/main.js $(VAULT_DIR)/styles.css $(VAULT_DIR)/manifest.json \
+	cp dist/main.js styles.css manifest.json \
 		$(DIST_DIR)/$(PLUGIN_ID)/
 	cp views/person/dist/index.js  $(DIST_DIR)/$(PLUGIN_ID)/views/person/index.js
 	cp views/org/dist/index.js     $(DIST_DIR)/$(PLUGIN_ID)/views/org/index.js

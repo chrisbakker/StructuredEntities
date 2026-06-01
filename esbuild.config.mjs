@@ -6,10 +6,23 @@ import { VAULT_PLUGIN_DIR } from "./vault.config.mjs";
 
 const prod = process.argv[2] === "production";
 
-// Ensure vault plugin directory exists and copy manifest
-mkdirSync(VAULT_PLUGIN_DIR, { recursive: true });
-copyFileSync("manifest.json", `${VAULT_PLUGIN_DIR}/manifest.json`);
-copyFileSync("styles.css", `${VAULT_PLUGIN_DIR}/styles.css`);
+// Always output to local dist/ first; then copy to vault if reachable.
+mkdirSync("dist", { recursive: true });
+
+/** Post-build plugin: copies dist/main.js + assets to vault (skipped in CI). */
+const deployPlugin = {
+  name: "deploy-to-vault",
+  setup(build) {
+    build.onEnd(() => {
+      try {
+        mkdirSync(VAULT_PLUGIN_DIR, { recursive: true });
+        copyFileSync("dist/main.js", `${VAULT_PLUGIN_DIR}/main.js`);
+        copyFileSync("manifest.json", `${VAULT_PLUGIN_DIR}/manifest.json`);
+        copyFileSync("styles.css", `${VAULT_PLUGIN_DIR}/styles.css`);
+      } catch { /* vault may not exist in CI */ }
+    });
+  },
+};
 
 const EXTERNAL = ["obsidian", "electron", "@codemirror/*", "@lezer/*", "node:*"];
 
@@ -25,13 +38,14 @@ const mainContext = await esbuild.context({
   logLevel: "info",
   sourcemap: prod ? false : "inline",
   treeShaking: true,
-  outfile: `${VAULT_PLUGIN_DIR}/main.js`,
+  outfile: "dist/main.js",
   minify: prod,
   plugins: [
     sveltePlugin({
       preprocess: sveltePreprocess(),
       compilerOptions: { css: "injected" },
     }),
+    deployPlugin,
   ],
 });
 
