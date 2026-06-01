@@ -1,0 +1,22 @@
+{
+  "name": "obsidian-entities",
+  "version": "0.1.0",
+  "description": "Entity view framework for local-first markdown entities",
+  "main": "main.js",
+  "workspaces": ["views/*"],
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production",
+    "build:views": "npm run build -ws --if-present",
+    "build:all": "npm run build && npm run build:views"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.21.0",
+    "esbuild-svelte": "^0.8.1",
+    "obsidian": "latest",
+    "svelte": "^4.2.0",
+    "svelte-preprocess": "^5.1.0",
+    "typescript": "^5.4.0"
+  }
+}

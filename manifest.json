@@ -1,0 +1,10 @@
+{
+  "id": "entities",
+  "name": "Structured Entities",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "Entity view framework — local-first UI runtime over a markdown entity database.",
+  "author": "chris",
+  "authorUrl": "https://github.com/chrisbakker",
+  "isDesktopOnly": true
+}

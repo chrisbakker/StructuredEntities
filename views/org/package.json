@@ -1,0 +1,10 @@
+{
+  "name": "entities-view-org",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production"
+  },
+  "devDependencies": {}
+}
