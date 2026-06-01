@@ -3,7 +3,9 @@ name: Release
 on:
   push:
     tags:
-      - "[0-9]+.[0-9]+.[0-9]+"   # triggers on tags like 1.2.3
+      - "v*.*.*"
+      - "*.*.*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -22,11 +24,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build plugin and views
-        run: npm run build:all
-
-      - name: Package
-        run: make package
+      - name: Build and package
+        run: make all
 
       # Obsidian's plugin installer fetches these three files individually
       # from the release assets. The zip is for manual installs.

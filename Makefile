@@ -38,6 +38,7 @@ build-views:
 ##       meeting/index.js
 package:
 	rm -rf $(DIST_DIR)/$(PLUGIN_ID)
+	rm -f $(DIST_DIR)/$(ZIP_NAME)
 	mkdir -p $(DIST_DIR)/$(PLUGIN_ID)/views/person
 	mkdir -p $(DIST_DIR)/$(PLUGIN_ID)/views/org
 	mkdir -p $(DIST_DIR)/$(PLUGIN_ID)/views/meeting

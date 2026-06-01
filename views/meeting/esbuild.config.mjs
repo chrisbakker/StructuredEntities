@@ -8,7 +8,9 @@ const prod = process.argv[2] === "production";
 const VAULT_VIEW_DIR = `${VAULT_PLUGIN_DIR}/views/meeting`;
 
 mkdirSync("dist", { recursive: true });
-mkdirSync(VAULT_VIEW_DIR, { recursive: true });
+try {
+  mkdirSync(VAULT_VIEW_DIR, { recursive: true });
+} catch { /* vault may not exist in CI */ }
 
 const EXTERNAL = ["obsidian", "electron", "@codemirror/*", "@lezer/*", "node:*"];
 
