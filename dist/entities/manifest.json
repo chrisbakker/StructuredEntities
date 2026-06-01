@@ -1,9 +1,0 @@
-{
-  "id": "entities",
-  "name": "Entities",
-  "version": "0.1.0",
-  "minAppVersion": "1.4.0",
-  "description": "Entity view framework — local-first UI runtime over a markdown entity database.",
-  "author": "chris",
-  "isDesktopOnly": true
-}
