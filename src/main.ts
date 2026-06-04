@@ -3,7 +3,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { EntityView, ENTITY_VIEW_TYPE } from "./EntityView";
 import { parseEntity } from "./parser";
-import { registerEntityView } from "./registry";
+import { registerEntityView, getEntityView } from "./registry";
 import { DEFAULT_SETTINGS, EntitiesSettingTab } from "./settings";
 import type { EntitiesSettings } from "./settings";
 import { CreateEntityModal } from "./CreateEntityModal";
@@ -65,6 +65,8 @@ export default class EntitiesPlugin extends Plugin {
         const content = await this.app.vault.read(file);
         const entity = parseEntity(file.path, content);
         if (!entity) return;
+        // Don't route files whose view type has been disabled.
+        if (!getEntityView(entity.type)) return;
 
         this.isRouting = true;
         try {
@@ -105,7 +107,8 @@ export default class EntitiesPlugin extends Plugin {
       if (!active?.file) return;
 
       const content = await this.app.vault.read(active.file);
-      if (!parseEntity(active.file.path, content)) return;
+      const startupEntity = parseEntity(active.file.path, content);
+      if (!startupEntity || !getEntityView(startupEntity.type)) return;
 
       this.isRouting = true;
       try {
@@ -162,6 +165,7 @@ export default class EntitiesPlugin extends Plugin {
         new Function("module", "exports", code)(mod, mod.exports);
         const { type, component } = mod.exports as { type?: string; component?: unknown };
         if (type && component) {
+          if (this.settings.disabledViews.includes(type)) continue;
           registerEntityView(type, component as Parameters<typeof registerEntityView>[1]);
         }
       } catch (e) {
