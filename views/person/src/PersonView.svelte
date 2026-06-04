@@ -10,12 +10,13 @@
   export let renderMarkdown: (markdown: string, el: HTMLElement) => Promise<void>;
   export let openLink: (href: string, newLeaf: boolean) => void;
   export let getSuggestions: (query: string) => string[];
+  export let onCreateEntity: (type: string, name: string) => Promise<string>;
 
   // ── Typed field accessors ──────────────────────────────────────────────────
 
   type PersonFields = {
     name?: { firstName?: string; lastName?: string; middleName?: string };
-    company?: { jobTitle?: string; name?: string };
+    company?: { jobTitle?: string; name?: string; manager?: string };
     phones?: { mobile?: string; work?: string; home?: string };
     email?: { work?: string; personal?: string };
     website?: string;
@@ -83,6 +84,79 @@
     const updated = { ...current, [subKey]: val };
     f = { ...f, [group]: updated as PersonFields[K] };
     onUpdateField(group, updated);
+  }
+
+  // ── Manager typeahead ─────────────────────────────────────────────────────
+
+  let managerQuery = str(f.company?.manager);
+  let managerSuggestions: string[] = [];
+  let selectedManagerSuggestionIndex = 0;
+  let managerShowCreate = false;
+
+  function refreshManagerSuggestions(query: string) {
+    if (!query.trim()) {
+      managerSuggestions = [];
+      managerShowCreate = false;
+      return;
+    }
+    managerSuggestions = getSuggestions(query).slice(0, 8);
+    managerShowCreate = !managerSuggestions.some(
+      (s) => s.toLowerCase() === query.toLowerCase()
+    );
+    selectedManagerSuggestionIndex = 0;
+  }
+
+  function handleManagerInput(e: Event) {
+    managerQuery = (e.target as HTMLInputElement).value;
+    const current = (f.company as Record<string, unknown>) ?? {};
+    f = { ...f, company: { ...current, manager: managerQuery } as PersonFields["company"] };
+    onUpdateField("company", f.company);
+    refreshManagerSuggestions(managerQuery);
+  }
+
+  function handleManagerKeydown(e: KeyboardEvent) {
+    e.stopPropagation();
+    const total = managerSuggestions.length + (managerShowCreate ? 1 : 0);
+    if (total === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      selectedManagerSuggestionIndex = (selectedManagerSuggestionIndex + 1) % total;
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      selectedManagerSuggestionIndex = (selectedManagerSuggestionIndex - 1 + total) % total;
+    } else if (e.key === "Enter" || e.key === "Tab") {
+      if (selectedManagerSuggestionIndex < managerSuggestions.length) {
+        e.preventDefault();
+        selectManager(managerSuggestions[selectedManagerSuggestionIndex]);
+      } else if (managerShowCreate) {
+        e.preventDefault();
+        createAndSelectManager(managerQuery);
+      }
+    } else if (e.key === "Escape") {
+      managerSuggestions = [];
+      managerShowCreate = false;
+    }
+  }
+
+  function handleManagerBlur() {
+    setTimeout(() => {
+      managerSuggestions = [];
+      managerShowCreate = false;
+    }, 150);
+  }
+
+  function selectManager(name: string) {
+    managerQuery = name;
+    const current = (f.company as Record<string, unknown>) ?? {};
+    f = { ...f, company: { ...current, manager: name } as PersonFields["company"] };
+    onUpdateField("company", f.company);
+    managerSuggestions = [];
+    managerShowCreate = false;
+  }
+
+  async function createAndSelectManager(name: string) {
+    const created = await onCreateEntity("person", name);
+    selectManager(created);
   }
 
   // ── Notes ──────────────────────────────────────────────────────────────────
@@ -184,6 +258,54 @@
               <input id="pv-companyName" class="field-input" type="text"
                 value={str(f.company?.name)}
                 on:input={(e) => setNested("company", "name", e)} />
+            </div>
+            <div class="field-row">
+              <label class="field-label" for="pv-manager">Manager</label>
+              <div class="field-person-wrapper">
+                <input id="pv-manager" class="field-input" type="text"
+                  placeholder="Search people…"
+                  bind:value={managerQuery}
+                  autocomplete="off"
+                  on:input={handleManagerInput}
+                  on:keydown={handleManagerKeydown}
+                  on:blur={handleManagerBlur}
+                />
+                {#if managerQuery}
+                  <button
+                    class="field-person-link-btn"
+                    title="Open {managerQuery}"
+                    tabindex="-1"
+                    on:mousedown|preventDefault={() => openLink(managerQuery, false)}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                      <polyline points="15 3 21 3 21 9"/>
+                      <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                  </button>
+                {/if}
+                {#if managerSuggestions.length > 0 || managerShowCreate}
+                  <ul class="field-person-suggestions" role="listbox">
+                    {#each managerSuggestions as s, si}
+                      <li
+                        role="option"
+                        aria-selected={si === selectedManagerSuggestionIndex}
+                        class:selected={si === selectedManagerSuggestionIndex}
+                        on:mousedown|preventDefault={() => selectManager(s)}
+                      >{s}</li>
+                    {/each}
+                    {#if managerShowCreate}
+                      <li
+                        role="option"
+                        class="field-person-create-option"
+                        aria-selected={selectedManagerSuggestionIndex === managerSuggestions.length}
+                        class:selected={selectedManagerSuggestionIndex === managerSuggestions.length}
+                        on:mousedown|preventDefault={() => createAndSelectManager(managerQuery)}
+                      >Create person "{managerQuery}"</li>
+                    {/if}
+                  </ul>
+                {/if}
+              </div>
             </div>
           </div>
         </div>
@@ -604,9 +726,77 @@
     color: var(--text-faint);
   }
 
-  /* ── Notes ── */
-  .person-notes {
+  /* ── Person-link field (manager) ── */
+  .field-person-wrapper {
+    position: relative;
     display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    width: 100%;
+  }
+
+  .field-person-wrapper .field-input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .field-person-link-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.1s, border-color 0.1s;
+  }
+
+  .field-person-link-btn:hover {
+    color: var(--interactive-accent);
+    border-color: var(--interactive-accent);
+  }
+
+  .field-person-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    max-height: 200px;
+    overflow-y: auto;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    list-style: none;
+    padding: 0.25rem 0;
+    margin: 0;
+  }
+
+  .field-person-suggestions li {
+    padding: 0.3rem 0.75rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    color: var(--text-normal);
+  }
+
+  .field-person-suggestions li.selected,
+  .field-person-suggestions li:hover {
+    background: var(--background-modifier-hover);
+  }
+
+  .field-person-create-option {
+    color: var(--interactive-accent);
+    font-style: italic;
+  }
+
+  /* ── Notes ── */
+  .person-notes {    display: flex;
     flex-direction: column;
     gap: 0.4rem;
   }
