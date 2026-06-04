@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from "svelte";
-  import { Editor } from "@tiptap/core";
+  import { Editor, Extension, InputRule } from "@tiptap/core";
   import StarterKit from "@tiptap/starter-kit";
   import Link from "@tiptap/extension-link";
   import Placeholder from "@tiptap/extension-placeholder";
@@ -14,6 +14,44 @@
   export let openLink: (href: string, newLeaf: boolean) => void = () => {};
   export let renderMarkdown: (md: string, el: HTMLElement) => Promise<void>;
   export let placeholder = "Write notes…";
+
+  // ── Wiki-link helpers ────────────────────────────────────────────────────
+  // Tiptap/markdown-it don't understand [[target]] natively, so we translate
+  // to a special wikilink:// URL scheme on the way in and back on the way out.
+
+  function wikiToMd(md: string): string {
+    return md.replace(/\[\[([^\]]+)\]\]/g, (_, t) =>
+      `[${t}](wikilink://${encodeURIComponent(t)})`
+    );
+  }
+
+  function mdToWiki(md: string): string {
+    return md.replace(/\[([^\]]+)\]\(wikilink:\/\/([^)]+)\)/g, (_, _display, encoded) =>
+      `[[${decodeURIComponent(encoded)}]]`
+    );
+  }
+
+  // InputRule: converts [[target]] typed in the WYSIWYG editor to a link mark.
+  const WikiLinkRule = Extension.create({
+    name: "wikiLinkRule",
+    addInputRules() {
+      return [
+        new InputRule({
+          find: /\[\[([^\]]+)\]\]$/,
+          handler: ({ state, range, match }) => {
+            const target = match[1];
+            const href = `wikilink://${encodeURIComponent(target)}`;
+            const { tr, schema } = state;
+            const linkType = schema.marks["link"];
+            if (!linkType) return;
+            tr.delete(range.from, range.to)
+              .insertText(target, range.from)
+              .addMark(range.from, range.from + target.length, linkType.create({ href }));
+          },
+        }),
+      ];
+    },
+  });
 
   // ── Mode ──────────────────────────────────────────────────────────────────
 
@@ -49,19 +87,27 @@
         StarterKit,
         Link.configure({
           openOnClick: false,
+          protocols: ["wikilink"],
           HTMLAttributes: { rel: "noopener noreferrer" },
         }),
         Placeholder.configure({ placeholder }),
         Markdown.configure({ html: false, transformPastedText: true }),
+        WikiLinkRule,
       ],
-      content: body,
+      content: wikiToMd(body),
       editorProps: {
         attributes: { class: "ne-prosemirror", spellcheck: "true" },
         handleClick(_view, _pos, event) {
           const link = (event.target as HTMLElement).closest("a");
           if (!link) return false;
-          const href = link.getAttribute("data-href") ?? link.getAttribute("href");
+          let href = link.getAttribute("href") ?? "";
           if (!href) return false;
+          // Wiki-links open on single click; regular links require ⌘/ctrl.
+          if (href.startsWith("wikilink://")) {
+            event.preventDefault();
+            openLink(decodeURIComponent(href.slice("wikilink://".length)), event.metaKey || event.ctrlKey);
+            return true;
+          }
           if (event.metaKey || event.ctrlKey) {
             event.preventDefault();
             openLink(href, true);
@@ -71,7 +117,7 @@
         },
       },
       onUpdate({ editor }) {
-        const md = editor.storage.markdown.getMarkdown();
+        const md = mdToWiki(editor.storage.markdown.getMarkdown());
         body = md;
         onUpdateBody(md);
       },
@@ -115,15 +161,63 @@
     return (e: MouseEvent) => { e.preventDefault(); fn(); };
   }
 
+  // ── Link popover ──────────────────────────────────────────────────────────
+
+  let linkPopover = false;
+  let linkHref = "";
+  let pendingLinkRange: { from: number; to: number } | null = null;
+  let linkInputEl: HTMLInputElement;
+
   function setLink() {
-    const prev = tiptap?.getAttributes("link").href ?? "";
-    const href = prompt("Link URL:", prev);
-    if (href === null) return;
-    if (href === "") {
-      tiptap?.chain().focus().extendMarkRange("link").unsetLink().run();
+    if (!tiptap) return;
+    const { from, to } = tiptap.state.selection;
+    pendingLinkRange = { from, to };
+    linkHref = tiptap.getAttributes("link").href ?? "";
+    linkPopover = true;
+    tick().then(() => linkInputEl?.focus());
+  }
+
+  function normalizeHref(raw: string): string {
+    const s = raw.trim();
+    // [[Page Name]] → wikilink://Page%20Name
+    const wikiMatch = s.match(/^\[\[(.+)\]\]$/);
+    if (wikiMatch) return `wikilink://${encodeURIComponent(wikiMatch[1])}`;
+    // Already has a URL scheme → use as-is
+    if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(s)) return s;
+    // Bare name / path with no scheme → treat as internal wikilink
+    return `wikilink://${encodeURIComponent(s)}`;
+  }
+
+  function confirmLink() {
+    linkPopover = false;
+    if (!tiptap || !pendingLinkRange) return;
+    const { from, to } = pendingLinkRange;
+    pendingLinkRange = null;
+    if (linkHref.trim() === "") {
+      tiptap.chain().focus()
+        .setTextSelection({ from, to })
+        .extendMarkRange("link")
+        .unsetLink()
+        .run();
     } else {
-      tiptap?.chain().focus().extendMarkRange("link").setLink({ href }).run();
+      const href = normalizeHref(linkHref);
+      tiptap.chain().focus()
+        .setTextSelection({ from, to })
+        .extendMarkRange("link")
+        .setMark("link", { href })
+        .run();
     }
+  }
+
+  function cancelLink() {
+    linkPopover = false;
+    pendingLinkRange = null;
+    tiptap?.commands.focus();
+  }
+
+  function handleLinkInputKeydown(e: KeyboardEvent) {
+    if (e.key === "Enter") { e.preventDefault(); confirmLink(); }
+    if (e.key === "Escape") { e.preventDefault(); cancelLink(); }
   }
 
   // ── Markdown mode ─────────────────────────────────────────────────────────
@@ -446,6 +540,21 @@
         </button>
 
       </div>
+
+      {#if linkPopover}
+        <div class="ne-link-bar">
+          <input
+            bind:this={linkInputEl}
+            class="ne-link-input"
+            type="text"
+            bind:value={linkHref}
+            placeholder="Entity name  or  https://url.com"
+            on:keydown={handleLinkInputKeydown}
+          />
+          <button class="ne-link-confirm" on:mousedown|preventDefault={confirmLink}>Apply</button>
+          <button class="ne-link-cancel" on:mousedown|preventDefault={cancelLink}>✕</button>
+        </div>
+      {/if}
     {/if}
 
     <!-- Editor surface (Tiptap mounts here) -->
@@ -693,9 +802,17 @@
   }
 
   :global(.ne-prosemirror a) {
-    color: var(--link-color);
+    color: var(--link-color, #4a90e2);
     text-decoration: underline;
     cursor: pointer;
+  }
+
+  /* Wiki-links look like Obsidian internal links */
+  :global(.ne-prosemirror a[href^="wikilink://"]) {
+    color: var(--link-color, #4a90e2);
+    text-decoration: none;
+    border-bottom: 1px solid var(--link-color, #4a90e2);
+    font-weight: 500;
   }
 
   :global(.ne-prosemirror hr) {
@@ -775,5 +892,58 @@
   .ne-suggestions li.selected,
   .ne-suggestions li:hover {
     background: var(--background-modifier-hover);
+  }
+
+  /* ── Link popover bar ── */
+  .ne-link-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.5rem;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-top: none;
+  }
+
+  .ne-link-input {
+    flex: 1;
+    font-size: 0.8rem;
+    padding: 0.2rem 0.45rem;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 3px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    outline: none;
+    font-family: inherit;
+  }
+
+  .ne-link-input:focus {
+    border-color: var(--interactive-accent);
+  }
+
+  .ne-link-confirm {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.55rem;
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .ne-link-cancel {
+    font-size: 0.8rem;
+    padding: 0.2rem 0.35rem;
+    background: transparent;
+    color: var(--text-muted);
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .ne-link-cancel:hover {
+    color: var(--text-normal);
   }
 </style>
