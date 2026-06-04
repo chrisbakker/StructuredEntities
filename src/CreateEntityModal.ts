@@ -1,4 +1,4 @@
-import { App, Modal, Notice, TFile } from "obsidian";
+import { App, Modal, Notice, TFile, stringifyYaml } from "obsidian";
 import { getRegisteredTypes } from "./registry";
 import type EntitiesPlugin from "./main";
 
@@ -88,6 +88,40 @@ export class CreateEntityModal extends Modal {
     this.contentEl.empty();
   }
 
+  /**
+   * Parse the entity name into sensible default field values so the view
+   * is pre-populated when the file first opens.
+   */
+  private buildInitialFields(type: string, name: string): Record<string, unknown> {
+    switch (type) {
+      case "person": {
+        // Strip a leading date prefix if present (e.g. copied from a meeting name)
+        const bare = name.replace(/^\d{4}-\d{2}-\d{2}\s+/, "").trim();
+        const parts = bare.split(/\s+/);
+        const firstName = parts[0] ?? "";
+        const lastName = parts.length > 1 ? parts[parts.length - 1] : "";
+        const middleName = parts.length > 2 ? parts.slice(1, -1).join(" ") : "";
+        const nameField: Record<string, unknown> = { firstName };
+        if (middleName) nameField.middleName = middleName;
+        if (lastName) nameField.lastName = lastName;
+        return { name: nameField };
+      }
+      case "meeting": {
+        // Name may already have a date prefix (e.g. "2026-06-01 Kickoff").
+        const dateMatch = name.match(/^(\d{4}-\d{2}-\d{2})\s+(.*)/);
+        if (dateMatch) {
+          return { title: dateMatch[2].trim(), date: dateMatch[1] };
+        }
+        return { title: name };
+      }
+      case "org": {
+        return { name };
+      }
+      default:
+        return {};
+    }
+  }
+
   private async handleCreate(): Promise<void> {
     let name = this.nameInput.value.trim();
     if (!name) {
@@ -120,7 +154,9 @@ export class CreateEntityModal extends Modal {
       return;
     }
 
-    const content = `---\ntype: ${this.selectedType}\n---\n`;
+    const fields = this.buildInitialFields(this.selectedType, name);
+    const yaml = stringifyYaml({ type: this.selectedType, ...fields }).trimEnd();
+    const content = `---\n${yaml}\n---\n`;
     const file = await this.app.vault.create(filePath, content);
     this.close();
     await this.app.workspace.getLeaf(false).openFile(file as TFile);
