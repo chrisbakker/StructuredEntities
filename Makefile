@@ -24,6 +24,7 @@ build-views:
 	npm run build -w views/person
 	npm run build -w views/org
 	npm run build -w views/meeting
+	npm run build -w views/recipe
 
 ## Package build artifacts into a zip ready for manual Obsidian deployment
 ##
@@ -36,16 +37,19 @@ build-views:
 ##       person/index.js
 ##       org/index.js
 ##       meeting/index.js
+##       recipe/index.js
 package:
 	rm -rf $(DIST_DIR)/$(PLUGIN_ID)
 	mkdir -p $(DIST_DIR)/$(PLUGIN_ID)/views/person
 	mkdir -p $(DIST_DIR)/$(PLUGIN_ID)/views/org
 	mkdir -p $(DIST_DIR)/$(PLUGIN_ID)/views/meeting
+	mkdir -p $(DIST_DIR)/$(PLUGIN_ID)/views/recipe
 	cp dist/main.js styles.css manifest.json \
 		$(DIST_DIR)/$(PLUGIN_ID)/
 	cp views/person/dist/index.js  $(DIST_DIR)/$(PLUGIN_ID)/views/person/index.js
 	cp views/org/dist/index.js     $(DIST_DIR)/$(PLUGIN_ID)/views/org/index.js
 	cp views/meeting/dist/index.js $(DIST_DIR)/$(PLUGIN_ID)/views/meeting/index.js
+	cp views/recipe/dist/index.js  $(DIST_DIR)/$(PLUGIN_ID)/views/recipe/index.js
 	cd $(DIST_DIR) && zip -r $(ZIP_NAME) $(PLUGIN_ID)
 	@echo ""
 	@echo "Packaged: $(DIST_DIR)/$(ZIP_NAME)"

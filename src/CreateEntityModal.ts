@@ -117,6 +117,9 @@ export class CreateEntityModal extends Modal {
       case "org": {
         return { name };
       }
+      case "recipe": {
+        return { title: name };
+      }
       default:
         return {};
     }

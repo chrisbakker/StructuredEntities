@@ -116,15 +116,11 @@ export class EntityView extends ItemView {
           const entityType = this.entity!.type;
           const entityId = this.entity!.id;
           const dir = `${attachmentsDir}/${entityType}`;
-          const filePath = `${dir}/${entityId}.${ext}`;
+          const suffix = Date.now().toString(36);
+          const filePath = `${dir}/${entityId}-${suffix}.${ext}`;
           try { await this.app.vault.createFolder(attachmentsDir); } catch { /* exists */ }
           try { await this.app.vault.createFolder(dir); } catch { /* exists */ }
-          const existing = this.app.vault.getAbstractFileByPath(filePath);
-          if (existing instanceof TFile) {
-            await this.app.vault.modifyBinary(existing, data);
-          } else {
-            await this.app.vault.createBinary(filePath, data);
-          }
+          await this.app.vault.createBinary(filePath, data);
           return filePath;
         },
         resolveAssetPath: (vaultPath: string): string => {
