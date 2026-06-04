@@ -6,7 +6,15 @@ export class CreateEntityModal extends Modal {
   private selectedType = "";
   private nameInput!: HTMLInputElement;
 
-  constructor(app: App, private plugin: EntitiesPlugin) {
+  /**
+   * @param targetDir  If provided, the entity file is created in this
+   *                   directory instead of settings.entitiesDir.
+   */
+  constructor(
+    app: App,
+    private plugin: EntitiesPlugin,
+    private targetDir?: string,
+  ) {
     super(app);
   }
 
@@ -99,7 +107,7 @@ export class CreateEntityModal extends Modal {
       }
     }
 
-    const dir = this.plugin.settings.entitiesDir.trim();
+    const dir = (this.targetDir ?? this.plugin.settings.entitiesDir).trim();
     const filePath = dir ? `${dir}/${name}.md` : `${name}.md`;
 
     // Ensure the target folder exists.

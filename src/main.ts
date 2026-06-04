@@ -1,4 +1,4 @@
-import { MarkdownView, Plugin, WorkspaceLeaf } from "obsidian";
+import { MarkdownView, Plugin, TFolder, WorkspaceLeaf } from "obsidian";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { EntityView, ENTITY_VIEW_TYPE } from "./EntityView";
@@ -28,6 +28,21 @@ export default class EntitiesPlugin extends Plugin {
     this.addRibbonIcon("file-plus", "New entity", () => {
       new CreateEntityModal(this.app, this).open();
     });
+
+    // File-explorer context menu: right-click a folder → "New entity here…"
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file) => {
+        const folder = file instanceof TFolder ? file : file.parent;
+        if (!folder) return;
+        menu.addItem((item) => {
+          item
+            .setTitle("New entity here…")
+            .setIcon("file-plus")
+            .setSection("action")
+            .onClick(() => new CreateEntityModal(this.app, this, folder.path).open());
+        });
+      })
+    );
 
     this.registerView(
       ENTITY_VIEW_TYPE,
