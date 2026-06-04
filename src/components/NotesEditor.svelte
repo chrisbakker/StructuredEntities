@@ -242,11 +242,22 @@
     }
   }
 
+  function autoGrow(ta: HTMLTextAreaElement) {
+    ta.style.height = "auto";
+    ta.style.height = ta.scrollHeight + "px";
+  }
+
+  function autoGrowAction(ta: HTMLTextAreaElement) {
+    autoGrow(ta);
+    return {};
+  }
+
   function handleBodyInput(e: Event) {
     const ta = e.target as HTMLTextAreaElement;
     body = ta.value;
     onUpdateBody(body);
     updateSuggestions(ta);
+    autoGrow(ta);
   }
 
   function handleBodyKeydown(e: KeyboardEvent) {
@@ -582,6 +593,7 @@
           {placeholder}
           on:input={handleBodyInput}
           on:keydown={handleBodyKeydown}
+          use:autoGrowAction
         />
         {#if suggestions.length > 0}
           <ul class="ne-suggestions" role="listbox">
@@ -831,7 +843,8 @@
     color: var(--text-normal);
     width: 100%;
     box-sizing: border-box;
-    resize: vertical;
+    resize: none;
+    overflow: hidden;
     font-family: var(--font-monospace);
     min-height: 200px;
     line-height: 1.55;
