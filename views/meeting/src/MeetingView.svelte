@@ -532,6 +532,20 @@
                   on:keydown={(e) => handleAttendeePersonKeydown(i, e)}
                   on:blur={handleAttendeePersonBlur}
                 />
+                {#if attendee.personId}
+                  <button
+                    class="attendee-link-btn"
+                    title="Open {attendee.personId}"
+                    tabindex="-1"
+                    on:mousedown|preventDefault={() => openLink(attendee.personId, false)}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                      <polyline points="15 3 21 3 21 9"/>
+                      <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                  </button>
+                {/if}
                 {#if activeAttendeeIndex === i && (attendeeSuggestions.length > 0 || attendeeShowCreate)}
                   <ul class="attendee-suggestions" role="listbox">
                     {#each attendeeSuggestions as s, si}
@@ -910,6 +924,30 @@
     outline: none;
     border-color: var(--interactive-accent);
     background: var(--background-primary);
+  }
+
+  .attendee-link-btn {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    color: var(--text-faint);
+    cursor: pointer;
+    transition: color 0.1s, background 0.1s;
+  }
+
+  .attendee-link-btn:hover {
+    color: var(--interactive-accent);
+    background: var(--background-modifier-hover);
   }
 
   .attendee-suggestions {
