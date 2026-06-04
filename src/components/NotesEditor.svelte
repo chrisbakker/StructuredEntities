@@ -122,8 +122,7 @@
         onUpdateBody(md);
       },
       onTransaction() {
-        // Reassigning triggers Svelte reactivity for toolbar active states.
-        tiptap = tiptap;
+        syncToolbar();
       },
     });
   }
@@ -153,8 +152,29 @@
 
   // ── WYSIWYG toolbar helpers ───────────────────────────────────────────────
 
-  function isActive(name: string, attrs?: Record<string, unknown>): boolean {
-    return tiptap?.isActive(name, attrs) ?? false;
+  let editorState = {
+    bold: false, italic: false, strike: false, code: false,
+    h1: false, h2: false, h3: false,
+    bulletList: false, orderedList: false, blockquote: false,
+    codeBlock: false, link: false,
+  };
+
+  function syncToolbar() {
+    if (!tiptap) return;
+    editorState = {
+      bold: tiptap.isActive("bold"),
+      italic: tiptap.isActive("italic"),
+      strike: tiptap.isActive("strike"),
+      code: tiptap.isActive("code"),
+      h1: tiptap.isActive("heading", { level: 1 }),
+      h2: tiptap.isActive("heading", { level: 2 }),
+      h3: tiptap.isActive("heading", { level: 3 }),
+      bulletList: tiptap.isActive("bulletList"),
+      orderedList: tiptap.isActive("orderedList"),
+      blockquote: tiptap.isActive("blockquote"),
+      codeBlock: tiptap.isActive("codeBlock"),
+      link: tiptap.isActive("link"),
+    };
   }
 
   function cmd(fn: () => unknown) {
@@ -419,21 +439,21 @@
       <div class="ne-toolbar" role="toolbar" aria-label="Formatting">
 
         <!-- Inline marks -->
-        <button class="tb-btn" class:active={isActive("bold")}
+        <button class="tb-btn" class:active={editorState.bold}
           on:mousedown={cmd(() => tiptap?.chain().focus().toggleBold().run())}
           title="Bold (⌘B)" aria-label="Bold"><strong>B</strong></button>
 
-        <button class="tb-btn" class:active={isActive("italic")}
+        <button class="tb-btn" class:active={editorState.italic}
           on:mousedown={cmd(() => tiptap?.chain().focus().toggleItalic().run())}
           title="Italic (⌘I)" aria-label="Italic"><em>I</em></button>
 
-        <button class="tb-btn" class:active={isActive("strike")}
+        <button class="tb-btn" class:active={editorState.strike}
           on:mousedown={cmd(() => tiptap?.chain().focus().toggleStrike().run())}
           title="Strikethrough" aria-label="Strikethrough">
           <s>S</s>
         </button>
 
-        <button class="tb-btn" class:active={isActive("code")}
+        <button class="tb-btn" class:active={editorState.code}
           on:mousedown={cmd(() => tiptap?.chain().focus().toggleCode().run())}
           title="Inline code" aria-label="Inline code">
           <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
@@ -446,22 +466,22 @@
         <div class="tb-sep" />
 
         <!-- Headings -->
-        <button class="tb-btn" class:active={isActive("heading", { level: 1 })}
+        <button class="tb-btn" class:active={editorState.h1}
           on:mousedown={cmd(() => tiptap?.chain().focus().toggleHeading({ level: 1 }).run())}
           title="Heading 1" aria-label="Heading 1">H1</button>
 
-        <button class="tb-btn" class:active={isActive("heading", { level: 2 })}
+        <button class="tb-btn" class:active={editorState.h2}
           on:mousedown={cmd(() => tiptap?.chain().focus().toggleHeading({ level: 2 }).run())}
           title="Heading 2" aria-label="Heading 2">H2</button>
 
-        <button class="tb-btn" class:active={isActive("heading", { level: 3 })}
+        <button class="tb-btn" class:active={editorState.h3}
           on:mousedown={cmd(() => tiptap?.chain().focus().toggleHeading({ level: 3 }).run())}
           title="Heading 3" aria-label="Heading 3">H3</button>
 
         <div class="tb-sep" />
 
         <!-- Lists -->
-        <button class="tb-btn" class:active={isActive("bulletList")}
+        <button class="tb-btn" class:active={editorState.bulletList}
           on:mousedown={cmd(() => tiptap?.chain().focus().toggleBulletList().run())}
           title="Bullet list" aria-label="Bullet list">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
@@ -475,7 +495,7 @@
           </svg>
         </button>
 
-        <button class="tb-btn" class:active={isActive("orderedList")}
+        <button class="tb-btn" class:active={editorState.orderedList}
           on:mousedown={cmd(() => tiptap?.chain().focus().toggleOrderedList().run())}
           title="Numbered list" aria-label="Numbered list">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
@@ -491,7 +511,7 @@
         <div class="tb-sep" />
 
         <!-- Block elements -->
-        <button class="tb-btn" class:active={isActive("blockquote")}
+        <button class="tb-btn" class:active={editorState.blockquote}
           on:mousedown={cmd(() => tiptap?.chain().focus().toggleBlockquote().run())}
           title="Blockquote" aria-label="Blockquote">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
@@ -502,7 +522,7 @@
           </svg>
         </button>
 
-        <button class="tb-btn" class:active={isActive("codeBlock")}
+        <button class="tb-btn" class:active={editorState.codeBlock}
           on:mousedown={cmd(() => tiptap?.chain().focus().toggleCodeBlock().run())}
           title="Code block" aria-label="Code block">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
@@ -516,7 +536,7 @@
         <div class="tb-sep" />
 
         <!-- Link -->
-        <button class="tb-btn" class:active={isActive("link")}
+        <button class="tb-btn" class:active={editorState.link}
           on:mousedown={cmd(setLink)}
           title="Insert / edit link" aria-label="Link">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
