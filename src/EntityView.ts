@@ -136,8 +136,23 @@ export class EntityView extends ItemView {
         openLink: (href: string, newLeaf: boolean): void => {
           if (/^https?:\/\//i.test(href)) {
             window.open(href, "_blank");
+          } else if (newLeaf) {
+            this.app.workspace.openLinkText(href, this.filePath ?? "", true);
           } else {
-            this.app.workspace.openLinkText(href, this.filePath ?? "", newLeaf);
+            const target = this.app.metadataCache.getFirstLinkpathDest(
+              href,
+              this.filePath ?? ""
+            );
+            if (target) {
+              // leaf.openFile() is Obsidian's standard navigation API.
+              // It pushes the current leaf state onto the history stack before
+              // opening the new file, so back/forward arrows work correctly.
+              // Routing then converts the resulting MarkdownView to EntityView.
+              this.leaf.openFile(target);
+            } else {
+              // File doesn't exist yet — let Obsidian handle creation.
+              this.app.workspace.openLinkText(href, this.filePath ?? "", false);
+            }
           }
         },
         getSuggestions: (query: string): string[] => {
