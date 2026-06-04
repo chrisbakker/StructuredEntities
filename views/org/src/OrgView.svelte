@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Entity } from "../../../src/types";
-  import { tick } from "svelte";
+  import NotesEditor from "../../../src/components/NotesEditor.svelte";
 
   export let entity: Entity;
   export let onUpdateField: (key: string, value: unknown) => void;
@@ -190,97 +190,10 @@
     memberShowCreate = false;
   }
 
-  // ── Notes (markdown editor with preview + [[ autocomplete) ────────────────
+  // ── Notes ────────────────────────────────────────────────────────────────
 
   let body = entity.body ?? "";
-  let previewMode = false;
-  let previewEl: HTMLDivElement;
-  let textareaEl: HTMLTextAreaElement;
-  let suggestions: string[] = [];
-  let selectedSuggestionIndex = 0;
-  let suggestionInsertPos = 0;
 
-  async function togglePreviewMode() {
-    suggestions = [];
-    previewMode = !previewMode;
-    if (previewMode) {
-      await tick();
-      if (previewEl) {
-        previewEl.innerHTML = "";
-        renderMarkdown(body, previewEl);
-      }
-    }
-  }
-
-  function handlePreviewClick(e: MouseEvent) {
-    const link = (e.target as HTMLElement).closest("a");
-    if (!link) return;
-    const href = link.getAttribute("data-href") || link.getAttribute("href");
-    if (!href) return;
-    e.preventDefault();
-    e.stopPropagation();
-    openLink(href, e.ctrlKey || e.metaKey);
-  }
-
-  function handlePreviewKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter") {
-      const link = (e.target as HTMLElement).closest("a");
-      if (!link) return;
-      const href = link.getAttribute("data-href") || link.getAttribute("href");
-      if (href) openLink(href, false);
-    }
-  }
-
-  function updateSuggestions(ta: HTMLTextAreaElement) {
-    const pos = ta.selectionStart;
-    const before = ta.value.slice(0, pos);
-    const match = before.match(/\[\[([^\]\[]*)$/);
-    if (match) {
-      suggestions = getSuggestions(match[1]).slice(0, 10);
-      selectedSuggestionIndex = 0;
-      suggestionInsertPos = before.length - match[0].length;
-    } else {
-      suggestions = [];
-    }
-  }
-
-  function handleBodyInput(e: Event) {
-    const ta = e.target as HTMLTextAreaElement;
-    body = ta.value;
-    onUpdateBody(body);
-    updateSuggestions(ta);
-  }
-
-  function handleBodyKeydown(e: KeyboardEvent) {
-    e.stopPropagation();
-    if (suggestions.length === 0) return;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      selectedSuggestionIndex = (selectedSuggestionIndex + 1) % suggestions.length;
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      selectedSuggestionIndex = (selectedSuggestionIndex - 1 + suggestions.length) % suggestions.length;
-    } else if (e.key === "Enter" || e.key === "Tab") {
-      e.preventDefault();
-      applySuggestion(suggestions[selectedSuggestionIndex]);
-    } else if (e.key === "Escape") {
-      suggestions = [];
-    }
-  }
-
-  async function applySuggestion(name: string) {
-    const ta = textareaEl;
-    const pos = ta.selectionStart;
-    const before = body.slice(0, suggestionInsertPos);
-    const after = body.slice(pos);
-    body = before + "[[" + name + "]]" + after;
-    onUpdateBody(body);
-    suggestions = [];
-    await tick();
-    const newPos = before.length + name.length + 4;
-    ta.setSelectionRange(newPos, newPos);
-    ta.focus();
-  }
 </script>
 
 <div class="org-view">
@@ -427,47 +340,7 @@
     </section>
 
     <!-- ── Notes ──────────────────────────────────────────────────────────── -->
-    <section class="org-section">
-      <div class="section-header">
-        <h2 class="section-label">Notes</h2>
-        <button class="notes-toggle" on:click={togglePreviewMode}>
-          {previewMode ? "Edit" : "Preview"}
-        </button>
-      </div>
-
-      {#if previewMode}
-        <div
-          bind:this={previewEl}
-          class="notes-preview markdown-rendered"
-          role="region"
-          aria-label="Notes preview"
-          on:click={handlePreviewClick}
-          on:keydown={handlePreviewKeydown}
-        ></div>
-      {:else}
-        <div class="body-wrapper">
-          <textarea
-            class="body-editor"
-            bind:this={textareaEl}
-            value={body}
-            on:input={handleBodyInput}
-            on:keydown={handleBodyKeydown}
-          />
-          {#if suggestions.length > 0}
-            <ul class="link-suggestions" role="listbox">
-              {#each suggestions as suggestion, i}
-                <li
-                  role="option"
-                  aria-selected={i === selectedSuggestionIndex}
-                  class:selected={i === selectedSuggestionIndex}
-                  on:mousedown|preventDefault={() => applySuggestion(suggestion)}
-                >{suggestion}</li>
-              {/each}
-            </ul>
-          {/if}
-        </div>
-      {/if}
-    </section>
+    <NotesEditor {body} {onUpdateBody} {getSuggestions} {openLink} {renderMarkdown} placeholder="Notes about this org…" />
 
   </div>
 </div>
@@ -810,88 +683,5 @@
     color: var(--text-faint);
   }
 
-  /* ── Notes toggle ── */
-  .notes-toggle {
-    font-size: 0.75rem;
-    padding: 0.15rem 0.6rem;
-    background: transparent;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: color 0.1s, border-color 0.1s;
-  }
-
-  .notes-toggle:hover {
-    color: var(--text-normal);
-    border-color: var(--interactive-accent);
-  }
-
-  /* ── Notes editor ── */
-  .body-wrapper {
-    position: relative;
-  }
-
-  .body-editor {
-    background: var(--background-secondary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    padding: 0.5rem 0.6rem;
-    font-size: 0.875rem;
-    color: var(--text-normal);
-    width: 100%;
-    box-sizing: border-box;
-    resize: vertical;
-    font-family: var(--font-monospace);
-    min-height: 300px;
-    line-height: 1.5;
-    transition: border-color 0.1s;
-  }
-
-  .body-editor:focus {
-    outline: none;
-    border-color: var(--interactive-accent);
-    background: var(--background-primary);
-  }
-
-  .link-suggestions {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    max-height: 200px;
-    overflow-y: auto;
-    background: var(--background-primary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    z-index: 100;
-    list-style: none;
-    padding: 0.25rem 0;
-    margin: 0;
-  }
-
-  .link-suggestions li {
-    padding: 0.3rem 0.7rem;
-    font-size: 0.875rem;
-    cursor: pointer;
-    color: var(--text-normal);
-  }
-
-  .link-suggestions li.selected,
-  .link-suggestions li:hover {
-    background: var(--background-modifier-hover);
-  }
-
-  /* ── Notes preview ── */
-  .notes-preview {
-    min-height: 300px;
-    padding: 0.5rem 0.75rem;
-    background: var(--background-secondary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    font-size: 0.875rem;
-    line-height: 1.6;
-    box-sizing: border-box;
-  }
+  /* ── Notes ── (editor styles now live in NotesEditor.svelte) ── */
 </style>
