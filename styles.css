@@ -61,3 +61,52 @@
   justify-content: flex-end;
   margin-top: 1.25rem;
 }
+
+/* ── Print / Export to PDF ───────────────────────────────────────────────── */
+
+#entity-print-root {
+  display: none;
+}
+
+@media print {
+  /* Hide all direct children of body except the print clone */
+  body > *:not(#entity-print-root) {
+    display: none !important;
+  }
+
+  #entity-print-root {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 1.5cm !important;
+    box-sizing: border-box !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Let all nested elements overflow freely for pagination */
+  #entity-print-root * {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    box-shadow: none !important;
+  }
+
+  /* Strip interactive chrome that looks odd on paper */
+  #entity-print-root button,
+  #entity-print-root .notes-toolbar,
+  #entity-print-root .notes-mode-toggle {
+    display: none !important;
+  }
+
+  #entity-print-root input,
+  #entity-print-root textarea {
+    border: none !important;
+    background: transparent !important;
+    color: #000 !important;
+    padding: 0 !important;
+    resize: none !important;
+  }
+}

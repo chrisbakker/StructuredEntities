@@ -51,6 +51,23 @@ export class EntityView extends ItemView {
         }
       })
     );
+    this.addAction("printer", "Print / Export to PDF", async () => {
+      await this.flushSave();
+
+      // Clone the view content to the root of <body> so it's outside
+      // Obsidian's overflow:hidden / fixed-height layout hierarchy.
+      const printRoot = document.createElement("div");
+      printRoot.id = "entity-print-root";
+      printRoot.innerHTML = this.contentEl.innerHTML;
+      document.body.appendChild(printRoot);
+
+      const cleanup = () => {
+        printRoot.remove();
+        window.removeEventListener("afterprint", cleanup);
+      };
+      window.addEventListener("afterprint", cleanup);
+      window.print();
+    });
   }
 
   async onOpen(): Promise<void> {
